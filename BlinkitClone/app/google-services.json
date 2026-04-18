@@ -1,0 +1,69 @@
+{
+  "project_info": {
+    "project_number": "463518318560",
+    "firebase_url": "https://blinkit-clone-d586f-default-rtdb.firebaseio.com",
+    "project_id": "blinkit-clone-d586f",
+    "storage_bucket": "blinkit-clone-d586f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:463518318560:android:4ca0990b8d10ea7f1d3585",
+        "android_client_info": {
+          "package_name": "com.BlinkitClone"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "463518318560-sdeh8rk09277ubbe9hancg143v2iob9p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_2RakdwEjcXi_i4jMYfPeqyEXkQbHrpI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "463518318560-sdeh8rk09277ubbe9hancg143v2iob9p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:463518318560:android:23f572e53fa1d38e1d3585",
+        "android_client_info": {
+          "package_name": "com.example.blinkitclone"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "463518318560-sdeh8rk09277ubbe9hancg143v2iob9p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_2RakdwEjcXi_i4jMYfPeqyEXkQbHrpI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "463518318560-sdeh8rk09277ubbe9hancg143v2iob9p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -7,11 +7,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowRight
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,6 +33,7 @@ import com.example.blinkitclone.viewmodels.HomeViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.example.blinkitclone.models.Order
 import com.example.blinkitclone.models.Product
+import com.example.blinkitclone.models.ChatMessage
 
 @Composable
 fun MainScreen(parentNavController: NavHostController, viewModel: HomeViewModel = viewModel()) {
@@ -71,8 +74,8 @@ fun MainScreen(parentNavController: NavHostController, viewModel: HomeViewModel 
                                 selectedIconColor = Color.Black,
                                 selectedTextColor = Color.Black,
                                 indicatorColor = Color.Transparent,
-                                unselectedIconColor = Color.Gray,
-                                unselectedTextColor = Color.Gray
+                                unselectedIconColor = Color.DarkGray,
+                                unselectedTextColor = Color.DarkGray
                             )
                         )
                     }
@@ -86,7 +89,96 @@ fun MainScreen(parentNavController: NavHostController, viewModel: HomeViewModel 
                 1 -> CategoriesScreen(viewModel)
                 2 -> CartScreen(viewModel)
                 3 -> ProfileScreen(parentNavController)
+                4 -> SupportChatScreen(parentNavController, viewModel)
             }
+        }
+    }
+}
+
+@Composable
+fun SupportChatScreen(navController: NavHostController, viewModel: HomeViewModel) {
+    val messages by viewModel.chatMessages.collectAsState()
+    val isBotTyping by viewModel.isBotTyping.collectAsState()
+    var textState by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(messages.size, isBotTyping) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF1F1F1))) {
+        Surface(modifier = Modifier.fillMaxWidth(), color = Color.White, shadowElevation = 2.dp) {
+            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.Default.ArrowBack, contentDescription = null) }
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(text = "Blinkit Assistant", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(text = if (isBotTyping) "Bot is typing..." else "Online", color = if(isBotTyping) Color(0xFF318616) else Color.DarkGray, fontSize = 12.sp)
+                }
+            }
+        }
+
+        LazyColumn(state = listState, modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
+            items(messages) { message ->
+                ChatBubble(message)
+            }
+            if (isBotTyping) {
+                item {
+                    Text(text = "typing...", color = Color.DarkGray, fontSize = 12.sp, modifier = Modifier.padding(8.dp))
+                }
+            }
+        }
+
+        Surface(modifier = Modifier.fillMaxWidth(), color = Color.White, shadowElevation = 16.dp) {
+            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = textState,
+                    onValueChange = { textState = it },
+                    placeholder = { Text("Ask about order, refund, coupon...") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
+                    maxLines = 3,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF318616),
+                        unfocusedBorderColor = Color.LightGray
+                    )
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                FloatingActionButton(
+                    onClick = { 
+                        if (textState.isNotBlank()) {
+                            viewModel.sendMessage(textState)
+                            textState = ""
+                        }
+                    },
+                    modifier = Modifier.size(48.dp),
+                    containerColor = Color(0xFF318616),
+                    contentColor = Color.White,
+                    shape = CircleShape
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatBubble(message: ChatMessage) {
+    val alignment = if (message.isUser) Alignment.End else Alignment.Start
+    val bubbleColor = if (message.isUser) Color(0xFF318616) else Color.White
+    val textColor = if (message.isUser) Color.White else Color.Black
+    val shape = if (message.isUser) {
+        RoundedCornerShape(16.dp, 16.dp, 2.dp, 16.dp)
+    } else {
+        RoundedCornerShape(16.dp, 16.dp, 16.dp, 2.dp)
+    }
+
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalAlignment = alignment) {
+        Surface(color = bubbleColor, shape = shape, shadowElevation = 1.dp) {
+            Text(text = message.message, color = textColor, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), fontSize = 14.sp)
         }
     }
 }
@@ -150,7 +242,7 @@ fun CartScreen(viewModel: HomeViewModel) {
     var orderStatus by remember { mutableStateOf("Cart") } // Cart or Tracking
 
     if (orderStatus == "Tracking") {
-        OrderTrackingUI { orderStatus = "Cart" }
+        OrderTrackingUI(viewModel) { orderStatus = "Cart" }
     } else if (cartItems.isEmpty()) {
         EmptyCartUI()
     } else {
@@ -158,7 +250,7 @@ fun CartScreen(viewModel: HomeViewModel) {
             Surface(modifier = Modifier.fillMaxWidth(), color = Color.White, shadowElevation = 2.dp) {
                 Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(text = "Checkout", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    Text(text = "${cartItems.size} items", color = Color.Gray)
+                    Text(text = "${cartItems.size} items", color = Color.DarkGray)
                 }
             }
             
@@ -203,7 +295,7 @@ fun CartItemUI(product: Product, viewModel: HomeViewModel) {
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = product.name ?: "", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text(text = product.unit ?: "", fontSize = 12.sp, color = Color.Gray)
+                Text(text = product.unit ?: "", fontSize = 12.sp, color = Color.DarkGray)
                 Text(text = "₹${product.price}", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
             }
             // Quantity Controls
@@ -230,11 +322,11 @@ fun BillSummaryUI(items: List<Product>) {
             Text(text = "Bill Summary", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(text = "Item Total", color = Color.Gray)
+                Text(text = "Item Total", color = Color.DarkGray)
                 Text(text = "₹$total")
             }
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(text = "Delivery Charge", color = Color.Gray)
+                Text(text = "Delivery Charge", color = Color.DarkGray)
                 Text(text = "FREE", color = Color(0xFF318616), fontWeight = FontWeight.Bold)
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
@@ -247,14 +339,19 @@ fun BillSummaryUI(items: List<Product>) {
 }
 
 @Composable
-fun OrderTrackingUI(onBack: () -> Unit) {
+fun OrderTrackingUI(viewModel: HomeViewModel, onBack: () -> Unit) {
+    val remainingTime by viewModel.remainingTime.collectAsState()
+    val minutes = remainingTime / 60
+    val seconds = remainingTime % 60
+    val timeString = String.format("%02d:%02d", minutes, seconds)
+
     Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
         Surface(modifier = Modifier.fillMaxWidth().height(300.dp), color = Color(0xFFE8F5E9)) {
             Box(contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color(0xFF318616))
                     Text("Order Placed Successfully!", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                    Text("Arriving in 10 minutes", color = Color.Gray)
+                    Text("Arriving in $timeString", color = if(remainingTime < 60) Color.Red else Color.DarkGray, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -279,7 +376,7 @@ fun StatusStep(title: String, time: String, isDone: Boolean) {
         Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(if (isDone) Color(0xFF318616) else Color.LightGray))
         Spacer(modifier = Modifier.width(16.dp))
         Text(text = title, modifier = Modifier.weight(1f), fontWeight = if(isDone) FontWeight.Bold else FontWeight.Normal)
-        Text(text = time, color = Color.Gray, fontSize = 12.sp)
+        Text(text = time, color = Color.DarkGray, fontSize = 12.sp)
     }
 }
 
@@ -288,7 +385,7 @@ fun EmptyCartUI() {
     Column(modifier = Modifier.fillMaxSize().background(Color.White), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Image(painter = painterResource(id = com.example.blinkitclone.R.drawable.cart), contentDescription = null, modifier = Modifier.size(150.dp))
         Text("You don't have anything in your cart", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Text("Search and add items to your cart", color = Color.Gray)
+        Text("Search and add items to your cart", color = Color.DarkGray)
     }
 }
 
@@ -319,6 +416,7 @@ fun ProfileScreen(navController: NavHostController, viewModel: HomeViewModel = v
                     ProfileOptionUI("Address Book", Icons.Default.LocationOn) { activeTab = "Address" }
                     ProfileOptionUI("Refund & Returns", Icons.Default.History) { activeTab = "Refunds" }
                     ProfileOptionUI("Customer Support", Icons.Default.SupportAgent) { activeTab = "Support" }
+                    ProfileOptionUI("Developer Settings", Icons.Default.Settings) { activeTab = "Dev" }
                     TextButton(onClick = { auth.signOut(); navController.navigate(Routes.Auth.route) { popUpTo(0) } }, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                         Text("Logout", color = Color.Red, fontWeight = FontWeight.Bold)
                     }
@@ -337,8 +435,27 @@ fun ProfileScreen(navController: NavHostController, viewModel: HomeViewModel = v
                     "Address" -> AddressBookScreen()
                     "Refunds" -> RefundStatusScreen()
                     "Support" -> CustomerSupportScreen()
+                    "Dev" -> DeveloperSettingsScreen(viewModel)
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun DeveloperSettingsScreen(viewModel: HomeViewModel) {
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Text("Developer Settings", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(20.dp))
+        Text("If your Firebase data is empty, you can use Demo Data to see the UI.", fontSize = 14.sp, color = Color.DarkGray)
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(
+            onClick = { viewModel.toggleDemoMode() },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+        ) {
+            val isDemo by viewModel.isDemoMode.collectAsState()
+            Text(if (isDemo) "Switch to Firebase Mode" else "Switch to Demo Mode")
         }
     }
 }
@@ -355,8 +472,8 @@ fun MyOrdersScreen(viewModel: HomeViewModel) {
                         Text(text = order.status, color = if(order.status == "Delivered") Color(0xFF318616) else Color(0xFFFFA000), fontWeight = FontWeight.Bold)
                     }
                     Text(text = "₹${order.totalPrice}", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(vertical = 4.dp))
-                    Text(text = "Items: ${order.items.joinToString { it.name ?: "" }}", fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(text = "Delivered to: ${order.address}", fontSize = 12.sp, color = Color.Gray)
+                    Text(text = "Items: ${order.items.joinToString { it.name ?: "" }}", fontSize = 12.sp, color = Color.DarkGray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(text = "Delivered to: ${order.address}", fontSize = 12.sp, color = Color.DarkGray)
                 }
             }
         }
@@ -387,7 +504,7 @@ fun AddressCard(label: String, address: String, isDefault: Boolean) {
                         Text("DEFAULT", color = Color(0xFF318616), fontSize = 8.sp, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
                     }
                 }
-                Text(text = address, fontSize = 13.sp, color = Color.Gray)
+                Text(text = address, fontSize = 13.sp, color = Color.DarkGray)
             }
         }
     }
@@ -410,7 +527,7 @@ fun RefundItem(orderId: String, amount: String, status: String, subtext: String)
                 Text(text = amount, fontWeight = FontWeight.ExtraBold)
             }
             Text(text = status, color = Color(0xFF318616), fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
-            Text(text = subtext, fontSize = 12.sp, color = Color.Gray)
+            Text(text = subtext, fontSize = 12.sp, color = Color.DarkGray)
         }
     }
 }
@@ -447,7 +564,7 @@ fun SupportOption(title: String, icon: androidx.compose.ui.graphics.vector.Image
 @Composable
 fun ProfileOptionUI(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(24.dp))
+        Icon(icon, contentDescription = null, tint = Color.DarkGray, modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.width(16.dp))
         Text(text = title, fontSize = 16.sp, modifier = Modifier.weight(1f))
         Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.LightGray)

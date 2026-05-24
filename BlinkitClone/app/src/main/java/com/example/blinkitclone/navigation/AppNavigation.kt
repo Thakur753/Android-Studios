@@ -27,5 +27,9 @@ fun AppNavigation() {
         composable(Routes.Main.route) {
             MainScreen(navController)
         }
+        composable("support_chat") {
+            val viewModel: com.example.blinkitclone.viewmodels.HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+            com.example.blinkitclone.screens.SupportChatScreen(navController, viewModel)
+        }
     }
 }

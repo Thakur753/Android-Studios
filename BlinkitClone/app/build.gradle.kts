@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.blinkitclone"
-    compileSdk = 36
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.blinkitclone"

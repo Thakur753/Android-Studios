@@ -83,7 +83,7 @@ fun AuthScreen(navController: NavHostController) {
             Text(
                 text = "Log in or sign up",
                 fontSize = 14.sp,
-                color = Color.Gray
+                color = Color.DarkGray
             )
 
             Spacer(modifier = Modifier.height(24.dp))

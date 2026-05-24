@@ -39,7 +39,7 @@ fun OTPScreen(navController: NavHostController, verificationId: String) {
         Text(
             text = "Enter the code sent to your number",
             fontSize = 14.sp,
-            color = Color.Gray,
+            color = Color.DarkGray,
             modifier = Modifier.padding(top = 8.dp)
         )
 

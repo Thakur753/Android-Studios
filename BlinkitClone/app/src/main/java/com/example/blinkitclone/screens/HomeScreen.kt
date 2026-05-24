@@ -1,5 +1,6 @@
 package com.example.blinkitclone.screens
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,7 +9,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
@@ -18,6 +21,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -33,49 +38,121 @@ import com.example.blinkitclone.R
 import com.example.blinkitclone.models.Category
 import com.example.blinkitclone.models.Product
 import com.example.blinkitclone.viewmodels.HomeViewModel
+import android.speech.RecognizerIntent
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.app.Activity
 
 @Composable
 fun HomeScreen(navController: NavHostController, viewModel: HomeViewModel = viewModel()) {
     val firebaseCategories by viewModel.categories.collectAsState()
     val firebaseProducts by viewModel.products.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val remainingTime by viewModel.remainingTime.collectAsState()
     
-    val categories = if (firebaseCategories.isNotEmpty()) firebaseCategories else getDemoCategories()
-    val allProducts = if (firebaseProducts.isNotEmpty()) firebaseProducts else getDemoProducts()
+    // Combine Firebase data with Demo data to ensure screen is never empty
+    val demoCategories = getDemoCategories()
+    val demoProducts = getDemoProducts()
+    
+    val displayCategories = (firebaseCategories + demoCategories).distinctBy { it.name?.lowercase() }
+    val displayProducts = (firebaseProducts + demoProducts).distinctBy { it.id }
 
     val filteredProducts = if (searchQuery.isEmpty()) {
-        allProducts
+        displayProducts
     } else {
-        allProducts.filter { it.name?.contains(searchQuery, ignoreCase = true) == true }
+        displayProducts.filter { it.name?.contains(searchQuery, ignoreCase = true) == true }
     }
 
     Scaffold(
-        topBar = { TopBarSection() }
+        topBar = { TopBarSection(remainingTime) },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { navController.navigate("support_chat") },
+                containerColor = Color(0xFF318616),
+                contentColor = Color.White,
+                shape = CircleShape
+            ) {
+                Icon(Icons.Default.Chat, contentDescription = "Support Chat")
+            }
+        }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(Color(0xFFF8F8F8))
-        ) {
-            item {
-                CustomSearchBar(searchQuery) { viewModel.setSearchQuery(it) }
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                ShimmerLoadingEffect()
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(Color(0xFFF8F8F8))
+            ) {
+                item {
+                    CustomSearchBar(searchQuery) { viewModel.setSearchQuery(it) }
+                }
                 
                 if (searchQuery.isEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    BannerSection()
-                    Spacer(modifier = Modifier.height(20.dp))
-                    CategoryGridSection(categories)
-                    Spacer(modifier = Modifier.height(20.dp))
-                    HorizontalProductSection("Bestsellers", allProducts, viewModel)
-                    Spacer(modifier = Modifier.height(20.dp))
-                    HorizontalProductSection("Snacks & Munchies", allProducts.reversed(), viewModel)
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        BannerSection()
+                    }
+                    item {
+                        Spacer(modifier = Modifier.height(20.dp))
+                        CategoryGridSection(displayCategories)
+                    }
+                    item {
+                        Spacer(modifier = Modifier.height(20.dp))
+                        HorizontalProductSection("Bestsellers", displayProducts, viewModel)
+                    }
+                    item {
+                        Spacer(modifier = Modifier.height(20.dp))
+                        HorizontalProductSection("Snacks & Munchies", displayProducts.reversed(), viewModel)
+                    }
                 } else {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    SearchProductGrid(filteredProducts, viewModel)
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        SearchProductGrid(filteredProducts, viewModel)
+                    }
                 }
-                Spacer(modifier = Modifier.height(100.dp))
+                item {
+                    Spacer(modifier = Modifier.height(100.dp))
+                }
             }
+        }
+    }
+}
+
+@Composable
+fun ShimmerLoadingEffect() {
+    val shimmerColors = listOf(
+        Color.LightGray.copy(alpha = 0.6f),
+        Color.LightGray.copy(alpha = 0.2f),
+        Color.LightGray.copy(alpha = 0.6f),
+    )
+
+    val transition = rememberInfiniteTransition(label = "")
+    val translateAnim = transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = ""
+    )
+
+    val brush = Brush.linearGradient(
+        colors = shimmerColors,
+        start = Offset.Zero,
+        end = Offset(x = translateAnim.value, y = translateAnim.value)
+    )
+
+    Column(modifier = Modifier.padding(16.dp)) {
+        repeat(3) {
+            Box(modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(16.dp)).background(brush))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -102,15 +179,43 @@ fun SearchProductGrid(products: List<Product>, viewModel: HomeViewModel) {
 
 @Composable
 fun CustomSearchBar(query: String, onQueryChange: (String) -> Unit) {
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.get(0)
+            if (spokenText != null) {
+                onQueryChange(spokenText)
+            }
+        }
+    }
+
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        placeholder = { Text(text = "Search \"chips\"", color = Color.Gray, fontSize = 14.sp) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
-        trailingIcon = { if(query.isNotEmpty()) IconButton(onClick = { onQueryChange("") }) { Icon(Icons.Default.Close, contentDescription = null) } },
+        placeholder = { Text(text = "Search \"chips\"", color = Color.DarkGray, fontSize = 14.sp) },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.DarkGray) },
+        trailingIcon = { 
+            Row {
+                IconButton(onClick = { 
+                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                    }
+                    speechLauncher.launch(intent)
+                }) {
+                    Icon(Icons.Default.Mic, contentDescription = "Voice Search", tint = Color(0xFF318616))
+                }
+                if(query.isNotEmpty()) {
+                    IconButton(onClick = { onQueryChange("") }) { 
+                        Icon(Icons.Default.Close, contentDescription = null) 
+                    }
+                }
+            }
+        },
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
             unfocusedContainerColor = Color.White,
@@ -123,7 +228,11 @@ fun CustomSearchBar(query: String, onQueryChange: (String) -> Unit) {
 }
 
 @Composable
-fun TopBarSection() {
+fun TopBarSection(remainingTime: Int) {
+    val minutes = remainingTime / 60
+    val seconds = remainingTime % 60
+    val timeString = String.format("%02d:%02d", minutes, seconds)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -135,9 +244,9 @@ fun TopBarSection() {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color(0xFF318616))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(text = "Delivery in 10 minutes", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                Text(text = "Delivery in $timeString", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = if(remainingTime < 60) Color.Red else Color.Black)
             }
-            Text(text = "H.No 123, New Delhi, India", fontSize = 12.sp, color = Color.Gray, maxLines = 1)
+            Text(text = "H.No 123, New Delhi, India", fontSize = 12.sp, color = Color.DarkGray, maxLines = 1)
         }
         IconButton(onClick = { /* Notification */ }) {
             Icon(Icons.Default.Notifications, contentDescription = null)
@@ -265,12 +374,16 @@ fun ProductItemUI(product: Product, viewModel: HomeViewModel) {
                 }
             }
             Text(text = product.name ?: "", fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 2, modifier = Modifier.height(36.dp), overflow = TextOverflow.Ellipsis)
-            Text(text = product.unit ?: "", fontSize = 11.sp, color = Color.Gray)
+            Text(text = product.unit ?: "", fontSize = 11.sp, color = Color.DarkGray)
             Spacer(modifier = Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column {
                     Text(text = "₹${product.price}", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
-                    Text(text = "₹${(product.price ?: 0) + 10}", fontSize = 10.sp, color = Color.Gray, style = androidx.compose.ui.text.TextStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough))
+                    Text(text = "₹${(product.price ?: 0) + 10}", fontSize = 10.sp, color = Color.DarkGray, style = androidx.compose.ui.text.TextStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough))
+                    
+                    if (product.stockCount in 1..5) {
+                        Text(text = "Only ${product.stockCount} left!", color = Color.Red, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
                 
                 val cartItems by viewModel.cart.collectAsState()
